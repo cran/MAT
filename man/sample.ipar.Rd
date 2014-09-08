@@ -2,7 +2,7 @@
 \alias{sample.ipar}
 \docType{data}
 \title{
-  sample item parameters
+  Sample item parameters
 }
 \description{
   A sample item parameter file containing 180 Multidimensional 3-PL (M3PL) model. 

@@ -10,7 +10,7 @@
 \usage{
   MAT(ipar, resp, cors,
       target.content.dist = NULL, content.cat = NULL, ncc = 1, 
-      p = stop("p is required"), 
+      content.order = NULL, p = stop("p is required"), 
       selectionMethod = c("D", "A", "C", "R"), 
       selectionType = c("FISHER", "BAYESIAN"), c.weights = NA, 
       stoppingCriterion = c("CONJUNCTIVE", "COMPENSATORY"), 
@@ -27,6 +27,7 @@
   \item{target.content.dist}{an optional vector of target content distributions summed to 1.0, e.g., c(0.25,0.5,0.25)}
   \item{content.cat}{an optional vector specifying content designations}
   \item{ncc}{the number of content categories (default=1, i.e., no content balancing)}
+  \item{content.order}{an optional vector specifying administration order of content categories, e.g., c(3,1,2)}
   \item{p}{the number of latent dimensions}
   \item{selectionMethod}{item selection criterion: "D"=D-optimality, "A"=A-optimality, "C"=C-optimality, "R"=Random (default="D")}
   \item{selectionType}{item selection method type: "FISHER"=Fisher information, "BAYESIAN"=adds inverse prior VCV}

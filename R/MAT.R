@@ -5,6 +5,7 @@ function(ipar,
               target.content.dist=NULL,
               content.cat=NULL,
               ncc=1,
+              content.order=NULL,
               p=stop("p is required"),
               selectionMethod=c("D","A","C","R"),
               selectionType=c("FISHER","BAYESIAN"),
@@ -75,62 +76,42 @@ content.balancing<-T
 if (any(target.content.dist<=0)) {
 available.items[which(content.cat %in% which(target.content.dist<=0))]<-FALSE
 }
+if (any(target.content.dist<0)) {
+  warning("ERROR: values in target.cont.dist cannot be negative")
 }
+}
+###add code for content ordering
+if (!is.null(content.order)) {
+  if (anyDuplicated(content.order)) { warning("ERROR: content categories are duplicated in content.order")
+  } else if (any(content.order<1) | any(content.order>p)) { warning("ERROR: content categories are out of range in content.order")
+  } else if (length(content.order)!= ncc) {warning("ERROR: number of content categories is not equal to ncc in content.order")
+  }
+  target.content.dist[content.order] <- target.content.dist
+  }
 }
 
 next.content<-function() {
-available.content<-which(target.content.dist>0)
-idx<-which.max(target.content.dist[available.content]-current.content.dist[available.content])
-return(available.content[idx])
+  available.content<-which(target.content.dist>=0)
+  idx<-which((target.content.dist[available.content]-current.content.dist[available.content])>0)
+  idx <- idx[1]
+  if (!is.null(content.order)) {idx <- content.order[idx] }
+  return(available.content[idx])
 }
 
 update.content.dist<-function() {
-idx<-content.cat[item.selected]
-current.content.freq[idx]<<-current.content.freq[idx]+1
-overall.content.freq[idx]<<-overall.content.freq[idx]+1
-current.content.dist<<-current.content.freq/ni.given
+  idx<-content.cat[item.selected]
+  if (!is.null(content.order)) {idx <- which(content.order==idx,arr.ind=TRUE) }
+  current.content.freq[idx]<<-current.content.freq[idx]+1
+  overall.content.freq[idx]<<-overall.content.freq[idx]+1
+  content.dist.denom <- c(minNI,ni.given)
+  current.content.dist<<-current.content.freq/(content.dist.denom[which.max(content.dist.denom)])
 }
+#####################################################################
 
-selectItem<-function(ipar,available,given,th,p,sigma,D=1.7,method="D",c.weights=NA,content.balancing=F,topN=1) {
-if (p != length(th)) stop("th and p are non-conforming")
-if (sum(available)==0) stop("no available items to be selected")
+estimates.full<-SCORE_cpp(ipar,resp,p,sigma,maxIter=maxIter,conv=conv,D=D,Fisher=T)
 
-ni<-nrow(ipar)
-
-info.given<-matrix(0,p,p)
-
-if (sum(given)>0) info.given<-makeFI(ipar[which(given),],th,p,sigma,D=D,add.sigma=F)
-
-if (p==1) sigma.inv<-1
-else sigma.inv<-solve(sigma)
-
-info<-rep(0,ni)
-
-if (content.balancing) {
-content.available<-available & (content.cat==next.content())
-if (sum(content.available)>=1) available<-content.available
-}
-
-for (i in 1:ni) {
-if (available[i]) {
-if (method=="R") info[i]<- runif(1) #random selection
-else {
-info.i<-calcFI(ipar[i,],th,p,D=D)
-info.matrix<-info.given+info.i
-if (selectionType=="BAYESIAN") info.matrix<-info.matrix + sigma.inv
-if (method=="D") info[i]<-det(info.matrix) #D-optimality: maximizing
-else if (method=="A") info[i]<- 1/sum(diag(ginv(info.matrix))) #A-optimality: minimizing
-else if (method=="C") info[i]<- -matrix(c.weights,1,p)%*%solve(info.matrix)%*%matrix(c.weights,p,1) #C-optimality: minimizing
-}
-}
-}
-info.index<-rev(order(info))
-if (topN > 1 && sum(available) > topN) item.selected<-info.index[sample(topN,1)]
-else item.selected=which(info==max(info,na.rm=T))[1]
-return(item.selected)
-}
-
-estimates.full<-SCORE(ipar,resp,p,sigma,maxIter=maxIter,conv=conv,D=D,Fisher=T)
+estimates.full$theta <- round(estimates.full$theta,4)
+estimates.full$SE <- round(estimates.full$SE,4)
 
 TH<-matrix(nrow=nj,ncol=p)
 SE<-matrix(nrow=nj,ncol=p)
@@ -148,87 +129,114 @@ se.history<-array(NA,c(nj,maxNI,p))
 if (plot.audit.trail) dev.new(record=T,width=10,height=6.5)
 if (is.null(theta.labels)) theta.labels<-paste("Theta",1:p,sep=" ")
 
+
+
+
 for (j in 1:nj) {
-se.met<-logical(p)
-theta.current<-start.theta
-rs<-resp[j,]
-
-W<-matrix(0,nrow=p,ncol=p) #initialize
-
-crit.met<-FALSE
-items.available<-available.items
-
-for (i in 1:ni) {
-if (is.na(rs[i]) || (rs[i] !=0 && rs[i] !=1)) items.available[i]<-FALSE
+  se.met<-logical(p)
+  theta.current<-start.theta
+  rs<-resp[j,]
+  
+  W<-matrix(0,nrow=p,ncol=p) #initialize
+  
+  crit.met<-FALSE
+  items.available<-available.items
+  
+  for (i in 1:ni) {
+    if (is.na(rs[i]) || (rs[i] !=0 && rs[i] !=1)) items.available[i]<-FALSE
+  }
+  items.given<-rep(FALSE,ni)
+  
+  max.to.administer<-ifelse(sum(items.available)<=maxNI,sum(items.available),maxNI)
+  ni.given<-0
+  
+  if (content.balancing) {
+    current.content.dist<-numeric(ncc)
+    current.content.freq<-numeric(ncc)
+  }
+  
+  
+  while (crit.met==FALSE && ni.given<max.to.administer) {
+    
+    available <- items.available
+    
+    if (content.balancing) {
+      content.available<-available & (content.cat==next.content())
+      if (sum(content.available)>=1) available<-content.available
+    }
+    
+    info <- selectItem_cpp(ipar,available,items.given,theta.current,p,sigma,D=D,method=selectionMethod,selectionType=selectionType,c_weights=c.weights,content_balancing=content.balancing,topN=topN)
+    
+    info.index<-rev(order(info))
+    if (topN > 1 && sum(items.available) > topN) { item.selected<-info.index[sample(topN,1)]
+    } else { item.selected=which(info==max(info,na.rm =T))[1] }
+    
+    ni.given<-ni.given+1
+    items.used[j,ni.given]<-item.selected
+    
+    
+    if (content.balancing) { update.content.dist() }
+    
+    items.available[item.selected]<-FALSE
+    items.given[item.selected]<-TRUE
+    
+    selected.item.resp[j,ni.given]<-resp[j,item.selected]
+    
+    estimates<-score_cpp(ipar[items.used[j,1:ni.given],,drop=F],rs[items.used[j,1:ni.given]],theta.current,p,sigma,maxIter=maxIter,conv=conv,D=D,Fisher=T)
+    
+    theta.current<-estimates$theta
+    theta.history[j,ni.given,]<-theta.current
+    se.history[j,ni.given,]<-estimates$SE
+    
+    if (stoppingCriterion=="CONJUNCTIVE") { se.met<-all(estimates$SE<=minSE)
+    } else if (stoppingCriterion=="COMPENSATORY") {
+      V<-solve(-estimates$Hessian)
+      if (selectionMethod=="C") cV<-sqrt(abs(matrix(c.weights,nrow=1)%*%V%*%matrix(c.weights,ncol=1)))
+      else cV<-sqrt(abs(matrix(rep(1/p,p),nrow=1)%*%V%*%matrix(rep(1/p,p),ncol=1)))
+      
+      se.met<-cV<=minSE
+    }
+    
+    if (ni.given>=max.to.administer || (se.met && ni.given>=minNI)) {
+      crit.met<-TRUE
+      theta.CAT[j,]<-round(estimates$theta,4)
+      se.CAT[j,]<-round(estimates$SE,4)
+      ni.administered[j]<-ni.given
+    }
+  }
+  
+  
+  
+  if (plot.audit.trail) {
+    plot(1:maxNI,seq(minTheta,maxTheta,length=maxNI),main=paste("CAT Audit Trail - Examinee ",j,sep=""),xlab="Items Administered",ylab="Theta",type="n",las=1,bg="white")
+    idx<-0
+    for (h in p:1) {
+      idx<-idx+1
+      points(1:ni.given,theta.history[j,1:ni.given,h],type="b",pch=8+h,lty=h,col=h)
+      abline(h=estimates.full$theta[j,h],lty=h,col=h)
+      text(1,minTheta+0.3*(idx),paste(theta.labels[h]," : ",sprintf("%6.3f",theta.CAT[j,h])," SE: ",sprintf("%5.3f",se.CAT[j,h])),cex=0.8,adj=0);
+    }
+    if (stoppingCriterion=="COMPENSATORY") text(1,minTheta+0.3*(idx+1),paste("cSE=",round(cV,digits=3),sep=""),cex=0.8,adj=0)
+    if (p>1) legend("bottomright",theta.labels,col=1:p,lty=1:p,pch=8+1:p,bg="white")
+    else if (p==1) {
+      for (i in 1:ni.given) {
+        lines(rep(i,2),c(theta.history[j,i,1]-1.96*se.history[j,i,1],theta.history[j,i,1]+1.96*se.history[j,i,1]),col="blue")
+      }
+    }
+    item.string<-paste(items.used[j,1:ni.given],collapse=",")
+    text(1,maxTheta,paste("Items: ",item.string,sep=""),cex=0.7,adj=0)
+    
+    resp.string<-paste(selected.item.resp[j,1:ni.given],collapse=",")
+    text(1,maxTheta-(maxTheta-minTheta)/20,paste("Responses: ",resp.string,sep=""),cex=0.7,adj=0)
+    
+    if (content.balancing) text(1,maxTheta-(maxTheta-minTheta)/10,paste("Content Distribution:",paste(round(current.content.dist,digits=2),collapse=",")),cex=0.7,adj=0)
+    
+  }
 }
-items.given<-rep(FALSE,ni)
 
-max.to.administer<-ifelse(sum(items.available)<=maxNI,sum(items.available),maxNI)
-ni.given<-0
 
-if (content.balancing) {
-current.content.dist<-numeric(ncc)
-current.content.freq<-numeric(ncc)
-}
 
-while (crit.met==FALSE && ni.given<max.to.administer) {
-item.selected<-selectItem(ipar,items.available,items.given,theta.current,p,sigma,D=D,method=selectionMethod,c.weights=c.weights,topN=topN,content.balancing=content.balancing)
-ni.given<-ni.given+1
-items.used[j,ni.given]<-item.selected
 
-if (content.balancing) update.content.dist()
-
-items.available[item.selected]<-FALSE
-selected.item.resp[j,ni.given]<-resp[j,item.selected]
-                  estimates<-score(ipar[items.used[j,1:ni.given],,drop=F],rs[items.used[j,1:ni.given]],theta.current,p,sigma,maxIter=maxIter,conv=conv,D=D,Fisher=T)
-
-theta.current<-estimates$theta
-theta.history[j,ni.given,]<-theta.current
-se.history[j,ni.given,]<-estimates$SE
-
-if (stoppingCriterion=="CONJUNCTIVE") se.met<-all(estimates$SE<=minSE)
-else if (stoppingCriterion=="COMPENSATORY") {
-V<-solve(-estimates$Hessian)
-if (selectionMethod=="C") cV<-sqrt(abs(matrix(c.weights,nrow=1)%*%V%*%matrix(c.weights,ncol=1)))
-else cV<-sqrt(abs(matrix(rep(1/p,p),nrow=1)%*%V%*%matrix(rep(1/p,p),ncol=1)))
-
-se.met<-cV<=minSE
-}
-
-if (ni.given>=max.to.administer || (se.met && ni.given>=minNI)) {
-crit.met<-TRUE
-theta.CAT[j,]<-estimates$theta
-se.CAT[j,]<-estimates$SE
-ni.administered[j]<-ni.given
-}
-}
-
-if (plot.audit.trail) {
-plot(1:maxNI,seq(minTheta,maxTheta,length=maxNI),main=paste("CAT Audit Trail - Examinee ",j,sep=""),xlab="Items Administered",ylab="Theta",type="n",las=1,bg="white")
-idx<-0
-for (h in p:1) {
-idx<-idx+1
-points(1:ni.given,theta.history[j,1:ni.given,h],type="b",pch=8+h,lty=h,col=h)
-abline(h=estimates.full$theta[j,h],lty=h,col=h)
-text(1,minTheta+0.3*(idx),paste(theta.labels[h]," : ",sprintf("%6.3f",theta.CAT[j,h])," SE: ",sprintf("%5.3f",se.CAT[j,h])),cex=0.8,adj=0);
-}
-if (stoppingCriterion=="COMPENSATORY") text(1,minTheta+0.3*(idx+1),paste("cSE=",round(cV,digits=3),sep=""),cex=0.8,adj=0)
-if (p>1) legend("bottomright",theta.labels,col=1:p,lty=1:p,pch=8+1:p,bg="white")
-else if (p==1) {
-for (i in 1:ni.given) {
-lines(rep(i,2),c(theta.history[j,i,1]-1.96*se.history[j,i,1],theta.history[j,i,1]+1.96*se.history[j,i,1]),col="blue")
-}
-}
-item.string<-paste(items.used[j,1:ni.given],collapse=",")
-text(1,maxTheta,paste("Items: ",item.string,sep=""),cex=0.7,adj=0)
-
-resp.string<-paste(selected.item.resp[j,1:ni.given],collapse=",")
-text(1,maxTheta-(maxTheta-minTheta)/20,paste("Responses: ",resp.string,sep=""),cex=0.7,adj=0)
-
-if (content.balancing) text(1,maxTheta-(maxTheta-minTheta)/10,paste("Content Distribution:",paste(round(current.content.dist,digits=2),collapse=",")),cex=0.7,adj=0)
-
-}
-}
 
 if (content.balancing) {
 overall.content.dist<-overall.content.freq/sum(overall.content.freq)

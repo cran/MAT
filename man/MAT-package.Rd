@@ -12,14 +12,14 @@ Multidimensional Adaptive Testing (MAT)
 \tabular{ll}{
 Package: \tab MAT\cr
 Type: \tab Package\cr
-Version: \tab 0.1-3\cr
+Version: \tab 2.0\cr
 Date: \tab 2011-01-25\cr
 License: \tab GPL \cr
 LazyLoad: \tab yes\cr
 }
 }
 \author{
-Seung W. Choi
+Seung W. Choi and David R. King
 
 Maintainer: Seung W. Choi <s-choi@northwestern.edu>
 }

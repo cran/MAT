@@ -2,7 +2,7 @@
 \alias{simM3PL}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
-  Simulate M3PL Item Responses
+  Simulate M3PL item responses
 }
 \description{
   Simulates item responses according to the Multidimensional 3-Parameter Logistic (M3PL) model
