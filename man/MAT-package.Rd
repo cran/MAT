@@ -46,8 +46,8 @@ Maintainer: Seung W. Choi <s-choi@northwestern.edu>
   target.content.dist1<-c(1/3,1/3,1/3) 
   #content category designations for items
   content.cat1<-rep(1:3,rep(60,3))
-  
-  \dontrun{MCAT.1<-MAT(sample.ipar,
+  #simulate multidimensional adaptive testing 
+  MCAT.1<-MAT(sample.ipar,
               resp1,
               vcv1,
               target.content.dist=target.content.dist1,
@@ -61,4 +61,3 @@ Maintainer: Seung W. Choi <s-choi@northwestern.edu>
               minNI=10,
               maxNI=30)
 	}
-}

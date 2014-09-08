@@ -46,6 +46,7 @@
   \item{theta.labels}{theta labels for plotting (default=c("Theta 1","Theta 2",...))}
   \item{easiness}{logical, T if d is related to the \emph{easiness} of items per Reckase, F otherwise}
 }
+
 \details{
   The purpose of this function is to simulate multidimensional adaptive testing based on the Multidimensional 3-Parameter Logistic (M3PL) model (Reckase, 2009):
   \deqn{P_i(\theta) \equiv P(U_i = 1|\boldsymbol{\theta}, \mathbf{a}_i, d_i, c_i) \equiv c_i + \frac{1-c_i}{1 + exp[-D(\mathbf{a}_i\cdot\boldsymbol{\theta} + d_i)]}}
@@ -73,9 +74,14 @@
 	\item{se.Full}{a matrix of SE estimates based on the full bank}
 	\item{ipar}{a matrix of item parameters}
 	\item{p}{the number of latent dimensions}
-%% ...
-
 }
+\note{
+\enumerate{
+  \item The MAT function performs a number of checks to determine if the arguments for content balancing and content ordering have been specified correctly. If the arguments have not been specified correctly, content balancing and/or content ordering will not be used for the simulation. Additionally, a warning message will be printed to the console detailing the misspecification.  
+  \item Content ordering is only available for fixed-length CAT. Namely, to invoke a particular content order, the user must set the minimum number of items equal to the maximum number of items (e.g., minNI=30 & maxNI=30).
+}
+}
+
 \references{
   \enumerate{
     \item Segall, D. O. (1996). Multidimensional adaptive testing, Psychometrika, 61(2), 331-354
@@ -87,7 +93,7 @@
   }
 }
 \author{
-  Seung W. Choi
+  Seung W. Choi and David R. King
 }
 \note{
   requires \pkg{MASS}

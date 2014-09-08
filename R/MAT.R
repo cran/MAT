@@ -80,33 +80,52 @@ if (any(target.content.dist<0)) {
   warning("ERROR: values in target.cont.dist cannot be negative")
 }
 }
-###add code for content ordering
+}
+###add warning messages for content ordering
 if (!is.null(content.order)) {
-  if (anyDuplicated(content.order)) { warning("ERROR: content categories are duplicated in content.order")
-  } else if (any(content.order<1) | any(content.order>p)) { warning("ERROR: content categories are out of range in content.order")
-  } else if (length(content.order)!= ncc) {warning("ERROR: number of content categories is not equal to ncc in content.order")
-  }
-  target.content.dist[content.order] <- target.content.dist
+  if (anyDuplicated(content.order)) { content.order <- NULL
+    warning("ERROR: content categories are duplicated in content.order\n:content ordering will not be used")
+  } else if (any(content.order<1) | any(content.order>p)) { content.order <- NULL
+    warning("ERROR: content categories are out of range in content.order\n: must specify content categories as integers
+            from 1 to ncc, where ncc is the number of content categories\n:content ordering will not be used")
+  } else if (length(content.order)!= ncc) { content.order <- NULL
+    warning("ERROR: number of content categories specified in content.order is not equal to ncc, where ncc is the number of
+            content categories\n:content ordering will not be used")
+  } else if (!is.null(content.order) & (minNI!=maxNI)) { content.order <- NULL
+    warning("ERROR: minNI must equal maxNI (i.e., fixed-length test) when content.order is specified\n:content ordering will not be used.") 
+  } else if (is.null(target.content.dist)) { content.order <- NULL
+    warning("ERROR: content distributions must be specified to use content ordering\n:content ordering will not be used.") 
   }
 }
 
 next.content<-function() {
-  available.content<-which(target.content.dist>=0)
-  idx<-which((target.content.dist[available.content]-current.content.dist[available.content])>0)
-  idx <- idx[1]
-  if (!is.null(content.order)) {idx <- content.order[idx] }
-  return(available.content[idx])
+  if (!is.null(content.order)) { 
+    completed.content <- which((target.content.dist-current.content.dist)<=0)
+    available.content <- 1:ncc
+    available.content[completed.content] <- NA
+    available.content <- available.content[content.order]
+    available.content <- available.content[!is.na(available.content)]
+    idx <- available.content[1]
+    return(idx)
+  }
+  else {
+    available.content<-which(target.content.dist>0)
+    idx<-which.max(target.content.dist[available.content]-current.content.dist[available.content])
+    return(available.content[idx])
+  }
 }
 
 update.content.dist<-function() {
   idx<-content.cat[item.selected]
-  if (!is.null(content.order)) {idx <- which(content.order==idx,arr.ind=TRUE) }
   current.content.freq[idx]<<-current.content.freq[idx]+1
   overall.content.freq[idx]<<-overall.content.freq[idx]+1
-  content.dist.denom <- c(minNI,ni.given)
-  current.content.dist<<-current.content.freq/(content.dist.denom[which.max(content.dist.denom)])
+  if (!is.null(content.order)) {
+    content.dist.denom <- c(minNI,ni.given)
+    current.content.dist<<-current.content.freq/(content.dist.denom[which.max(content.dist.denom)])
+  } else {
+    current.content.dist<<-current.content.freq/ni.given
+  }
 }
-#####################################################################
 
 estimates.full<-SCORE_cpp(ipar,resp,p,sigma,maxIter=maxIter,conv=conv,D=D,Fisher=T)
 
@@ -128,9 +147,6 @@ se.history<-array(NA,c(nj,maxNI,p))
 
 if (plot.audit.trail) dev.new(record=T,width=10,height=6.5)
 if (is.null(theta.labels)) theta.labels<-paste("Theta",1:p,sep=" ")
-
-
-
 
 for (j in 1:nj) {
   se.met<-logical(p)
@@ -162,10 +178,13 @@ for (j in 1:nj) {
     
     if (content.balancing) {
       content.available<-available & (content.cat==next.content())
+      
       if (sum(content.available)>=1) available<-content.available
     }
     
     info <- selectItem_cpp(ipar,available,items.given,theta.current,p,sigma,D=D,method=selectionMethod,selectionType=selectionType,c_weights=c.weights,content_balancing=content.balancing,topN=topN)
+    
+    info[!available] <- NA
     
     info.index<-rev(order(info))
     if (topN > 1 && sum(items.available) > topN) { item.selected<-info.index[sample(topN,1)]
@@ -206,7 +225,6 @@ for (j in 1:nj) {
   }
   
   
-  
   if (plot.audit.trail) {
     plot(1:maxNI,seq(minTheta,maxTheta,length=maxNI),main=paste("CAT Audit Trail - Examinee ",j,sep=""),xlab="Items Administered",ylab="Theta",type="n",las=1,bg="white")
     idx<-0
@@ -234,11 +252,8 @@ for (j in 1:nj) {
   }
 }
 
-
-
-
-
 if (content.balancing) {
+  
 overall.content.dist<-overall.content.freq/sum(overall.content.freq)
 content.dist<-rbind(target.content.dist,overall.content.dist)
 par.mar<-par()$mar
