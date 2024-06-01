@@ -1,4 +1,4 @@
-e2664c0cbc897aabaa9677d6901b5956 *DESCRIPTION
+f0eab2c36d79343bc6181ffcd003e228 *DESCRIPTION
 7571570e43803b0f0bc113d19df2a7ab *NAMESPACE
 0a3d0d0812b7e52e46623e49a7c8fca0 *R/MAT.R
 5b1265ac34ec776e0983c642f85771c8 *R/RcppExports.R
@@ -7,7 +7,7 @@ f5406edef61c77879b92ae5438fe1f5e *R/simM3PL.R
 fcf61beaa4cc5a83bbf7af6a1f484d35 *README.md
 60232349a1fb62fa86d86949f3ab945e *data/sample.ipar.rda
 e93b003c25e9b910b49ac0986be85d48 *man/MAT-internal.Rd
-ce5a131151d3f06fd731a0bdd32924c8 *man/MAT-package.Rd
+0bd1d3726ff0a39f1f43aabb8102c187 *man/MAT-package.Rd
 bcf22dfe1384a013a68d8f3e7d84756d *man/MAT.Rd
 7aea0145b40e4e89db9cbd08e45fa016 *man/sample.ipar.Rd
 f4c532247b2a8e6bd50e5624a41041fb *man/simM3PL.Rd
